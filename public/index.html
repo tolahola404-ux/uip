@@ -4,6 +4,9 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Notes Tool</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;background:#f5f5f5;color:#1a1a1a;height:100vh;display:flex;flex-direction:column}
@@ -52,8 +55,8 @@
   <div class="messages-area" id="messages">
     <div class="empty" id="emptyState">
       Type a question or attach any file<br>
-      <span style="font-size:12px">Enter to send &nbsp;·&nbsp; Shift+Enter for new line</span><br>
-      <span style="font-size:11px;color:#ccc">PDF · Word · Images · ZIP · Code · Any file</span>
+      <span style="font-size:12px">Enter to send · Shift+Enter for new line</span><br>
+      <span style="font-size:11px;color:#ccc">ZIP · RAR · PDF · Word · Images · Code · Any file</span>
     </div>
   </div>
 
@@ -65,7 +68,7 @@
       <img id="fpThumb" class="fp-thumb"/>
       <span id="fpIcon">📎</span>
       <span id="fpName"></span>
-      <span id="fpSize" style="color:#aaa;font-size:11px"></span>
+      <span id="fpMeta" style="color:#aaa;font-size:11px"></span>
       <button class="btn-rm" onclick="removeFile()">×</button>
     </div>
   </div>
@@ -79,267 +82,254 @@
   </div>
 
 <script>
-const SYSTEM = "You are a helpful assistant specialising in Java, Spring Boot, and software development. Be clear, concise and accurate. When shown code or files, analyse them carefully before answering.";
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-let msgs = [], loading = false, uploading = false;
-let att = null; // { name, file_id, mime_type, isImage, dataUrl, size }
+const SYSTEM=`You are a helpful assistant specialising in Java, Spring Boot, and software development.
+When given a project structure with multiple files, understand how they relate to each other before answering.
+Be clear, concise and accurate.`;
 
-const msgsEl   = document.getElementById("messages");
-const inp      = document.getElementById("inp");
-const sendBtn  = document.getElementById("sendBtn");
-const errorBar = document.getElementById("errorBar");
-const statusBar= document.getElementById("statusBar");
-const emptyEl  = document.getElementById("emptyState");
-const clearBtn = document.getElementById("clearBtn");
-const fpBar    = document.getElementById("fpBar");
-const fpName   = document.getElementById("fpName");
-const fpIcon   = document.getElementById("fpIcon");
-const fpSize   = document.getElementById("fpSize");
-const fpThumb  = document.getElementById("fpThumb");
-const attachBtn= document.getElementById("attachBtn");
+let msgs=[],loading=false,processing=false;
+let att=null; // { name, content, isImage, dataUrl, meta }
 
-inp.addEventListener("input", updateBtn);
+const msgsEl   =document.getElementById("messages");
+const inp      =document.getElementById("inp");
+const sendBtn  =document.getElementById("sendBtn");
+const errorBar =document.getElementById("errorBar");
+const statusBar=document.getElementById("statusBar");
+const emptyEl  =document.getElementById("emptyState");
+const clearBtn =document.getElementById("clearBtn");
+const fpBar    =document.getElementById("fpBar");
+const fpName   =document.getElementById("fpName");
+const fpIcon   =document.getElementById("fpIcon");
+const fpMeta   =document.getElementById("fpMeta");
+const fpThumb  =document.getElementById("fpThumb");
+const attachBtn=document.getElementById("attachBtn");
 
-function updateBtn() {
-  sendBtn.disabled = (!inp.value.trim() && !att) || loading || uploading;
-  attachBtn.disabled = uploading || loading;
+inp.addEventListener("input",updateBtn);
+function updateBtn(){sendBtn.disabled=(!inp.value.trim()&&!att)||loading||processing;attachBtn.disabled=processing||loading;}
+function autoResize(el){el.style.height="40px";el.style.height=Math.min(el.scrollHeight,140)+"px";}
+function handleKey(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();if(!sendBtn.disabled)send();}}
+function showErr(m){errorBar.textContent="⚠ "+m;errorBar.style.display="block";}
+function hideErr(){errorBar.style.display="none";}
+function showStatus(m){statusBar.textContent=m;statusBar.style.display="block";}
+function hideStatus(){statusBar.style.display="none";}
+
+// ── FILE TYPE HELPERS ────────────────────────────────────────────────────────
+function getExt(name){return name.split('.').pop().toLowerCase();}
+function isZip(name){return['zip','rar','7z','tar','gz','bz2'].includes(getExt(name));}
+function isImage(name,mime){return['jpg','jpeg','png','gif','webp','bmp','svg'].includes(getExt(name))||mime.startsWith('image/');}
+function isPDF(name){return getExt(name)==='pdf';}
+function isWord(name){return['doc','docx'].includes(getExt(name));}
+
+function getIcon(name){
+  const e=getExt(name);
+  if(['zip','rar','7z','tar','gz'].includes(e)) return'🗜️';
+  if(e==='pdf') return'📕';
+  if(['doc','docx'].includes(e)) return'📘';
+  if(['jpg','jpeg','png','gif','webp'].includes(e)) return'🖼️';
+  if(['java','py','js','ts','cpp','c','cs'].includes(e)) return'☕';
+  if(['json','xml','yml','yaml'].includes(e)) return'⚙️';
+  return'📄';
 }
 
-function autoResize(el) {
-  el.style.height = "40px";
-  el.style.height = Math.min(el.scrollHeight, 140) + "px";
+function formatSize(b){
+  if(b<1024) return b+' B';
+  if(b<1024*1024) return (b/1024).toFixed(1)+' KB';
+  return (b/(1024*1024)).toFixed(1)+' MB';
 }
 
-function handleKey(e) {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    if (!sendBtn.disabled) send();
-  }
-}
+// ── READERS ──────────────────────────────────────────────────────────────────
+function readText(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=()=>rej(new Error("fail"));r.readAsText(f);});}
+function readURL(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=()=>rej(new Error("fail"));r.readAsDataURL(f);});}
+function readBuf(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=()=>rej(new Error("fail"));r.readAsArrayBuffer(f);});}
 
-function showErr(m) { errorBar.textContent = "⚠ " + m; errorBar.style.display = "block"; }
-function hideErr()  { errorBar.style.display = "none"; }
-function showStatus(m) { statusBar.textContent = m; statusBar.style.display = "block"; }
-function hideStatus()  { statusBar.style.display = "none"; }
+// ── SKIP THESE FILES IN ZIP ───────────────────────────────────────────────────
+const SKIP_PATTERNS=[
+  /^__MACOSX/,/\.DS_Store$/,/Thumbs\.db$/,
+  /\.class$/,/\.jar$/,/\.war$/,/\.ear$/,
+  /\/target\//,/\/\.git\//,/\/\.idea\//,/\/\.vscode\//,
+  /\/node_modules\//,/\/bin\//,/\/out\//,/\/build\//,
+];
+function shouldSkip(path){return SKIP_PATTERNS.some(p=>p.test(path));}
 
-function formatSize(bytes) {
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + " KB";
-  return (bytes/(1024*1024)).toFixed(1) + " MB";
-}
+// ── TEXT EXTENSIONS ───────────────────────────────────────────────────────────
+const TEXT_EXTS=['java','js','ts','py','c','cpp','cs','go','rb','php','swift','kt','rs',
+  'sh','bash','sql','html','css','xml','json','yaml','yml','md','txt','csv',
+  'properties','env','toml','ini','cfg','gradle','xml','pom','log','jsp','ftl'];
+function isTextFile(name){return TEXT_EXTS.includes(getExt(name));}
 
-function getIcon(name, mime) {
-  const ext = name.split('.').pop().toLowerCase();
-  if (['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext) || mime.startsWith('image/')) return '🖼️';
-  if (ext === 'pdf') return '📕';
-  if (['doc','docx'].includes(ext)) return '📘';
-  if (['xls','xlsx'].includes(ext)) return '📗';
-  if (['ppt','pptx'].includes(ext)) return '📙';
-  if (['zip','rar','7z','tar','gz'].includes(ext)) return '🗜️';
-  if (['java','py','js','ts','cpp','c','cs','go','rb','php'].includes(ext)) return '☕';
-  if (['json','xml','yml','yaml'].includes(ext)) return '⚙️';
-  return '📄';
-}
+// ── PROCESS ZIP ───────────────────────────────────────────────────────────────
+async function processZip(file){
+  showStatus("📦 Extracting "+file.name+"...");
+  const buf=await readBuf(file);
+  const zip=await JSZip.loadAsync(buf);
 
-function isImageFile(name, mime) {
-  const ext = name.split('.').pop().toLowerCase();
-  return ['jpg','jpeg','png','gif','webp','bmp'].includes(ext) || mime.startsWith('image/');
-}
+  const allPaths=[];
+  zip.forEach((path,entry)=>{if(!entry.dir&&!shouldSkip(path)) allPaths.push({path,entry});});
 
-// ── HANDLE FILE SELECTION ────────────────────────────────────────────────────
-async function handleFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  e.target.value = "";
-
-  uploading = true;
-  updateBtn();
-  showStatus("⏳ Uploading " + file.name + " to Claude...");
-  hideErr();
-
-  try {
-    // If image, get dataUrl for preview
-    let dataUrl = null;
-    if (isImageFile(file.name, file.type)) {
-      dataUrl = await readAsDataURL(file);
-    }
-
-    // Upload to Anthropic via our proxy
-    const formData = new FormData();
-    formData.append("file", file, file.name);
-
-    const res = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await res.json();
-
-    if (!res.ok || data.error) {
-      showErr("Upload failed: " + (data.error || "unknown error"));
-      return;
-    }
-
-    att = {
-      name: file.name,
-      file_id: data.file_id,
-      mime_type: data.mime_type || file.type,
-      isImage: isImageFile(file.name, file.type),
-      dataUrl,
-      size: file.size,
-    };
-
-    showFP(file.name, file.size, dataUrl);
-    hideStatus();
-
-  } catch (err) {
-    showErr("Upload error: " + err.message);
-    hideStatus();
-  } finally {
-    uploading = false;
-    updateBtn();
-  }
-}
-
-function readAsDataURL(file) {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = e => res(e.target.result);
-    r.onerror = () => rej(new Error("Read failed"));
-    r.readAsDataURL(file);
+  // Sort — Java files first, then others
+  allPaths.sort((a,b)=>{
+    const aJ=a.path.endsWith('.java')?0:1;
+    const bJ=b.path.endsWith('.java')?0:1;
+    return aJ-bJ||a.path.localeCompare(b.path);
   });
-}
 
-function showFP(name, size, dataUrl) {
-  fpIcon.textContent = getIcon(name, "");
-  fpName.textContent = name;
-  fpSize.textContent = formatSize(size);
-  if (dataUrl) { fpThumb.src = dataUrl; fpThumb.style.display = "block"; }
-  else { fpThumb.style.display = "none"; }
-  fpBar.classList.add("on");
-  updateBtn();
-}
+  // Build tree
+  const treePaths=allPaths.map(f=>"  "+f.path);
+  let content=`[Archive: ${file.name}]\n`;
+  content+=`Total files: ${allPaths.length}\n\n`;
+  content+=`Project Structure:\n${treePaths.join('\n')}\n\n`;
+  content+="=".repeat(60)+"\n\n";
 
-function removeFile() {
-  att = null;
-  fpBar.classList.remove("on");
-  fpThumb.style.display = "none";
-  updateBtn();
-}
-
-function escH(t) {
-  return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-}
-
-function addMsg(role, text, fileInfo, imgDataUrl) {
-  emptyEl.style.display = "none";
-  clearBtn.style.display = "block";
-
-  const div = document.createElement("div");
-  div.className = `msg msg--${role}`;
-
-  let html = `<div class="msg-label">${role === "user" ? "You" : "Claude"}</div>`;
-
-  if (fileInfo) {
-    if (imgDataUrl) html += `<img src="${imgDataUrl}" class="img-preview-msg"/>`;
-    html += `<div class="file-badge">${getIcon(fileInfo.name, "")} ${escH(fileInfo.name)}</div>`;
+  let processed=0;
+  for(const {path,entry} of allPaths){
+    if(isTextFile(path)){
+      showStatus(`📦 Reading ${++processed}/${allPaths.length}: ${path.split('/').pop()}...`);
+      try{
+        const text=await entry.async("string");
+        content+=`=== ${path} ===\n${text}\n\n`;
+      }catch(e){
+        content+=`=== ${path} ===\n[Could not read: ${e.message}]\n\n`;
+      }
+    }else{
+      content+=`=== ${path} ===\n[Binary file — skipped]\n\n`;
+    }
   }
 
-  html += `<div class="msg-bubble">${escH(text)}</div>`;
-  div.innerHTML = html;
-  msgsEl.appendChild(div);
-  msgsEl.scrollTop = msgsEl.scrollHeight;
+  return{content,meta:`${allPaths.length} files extracted`};
 }
 
-function clearChat() {
-  msgs = [];
-  msgsEl.innerHTML = "";
-  msgsEl.appendChild(emptyEl);
-  emptyEl.style.display = "block";
-  clearBtn.style.display = "none";
-  hideErr();
-  removeFile();
-}
-
-// ── BUILD MESSAGE CONTENT WITH file_id ──────────────────────────────────────
-function buildUserContent(text, file) {
-  if (!file) return text;
-
-  const userText = text || "Please review this file and help me.";
-
-  if (file.isImage) {
-    // Image block
-    return [
-      { type: "image", source: { type: "file", file_id: file.file_id } },
-      { type: "text", text: userText }
-    ];
-  } else {
-    // Document block — works for PDF, Word, code, zip, etc.
-    return [
-      { type: "document", source: { type: "file", file_id: file.file_id } },
-      { type: "text", text: userText }
-    ];
+// ── PROCESS PDF ───────────────────────────────────────────────────────────────
+async function processPDF(file){
+  showStatus("📕 Reading PDF...");
+  const buf=await readBuf(file);
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  let text=`[PDF: ${file.name} — ${pdf.numPages} page(s)]\n\n`;
+  for(let i=1;i<=pdf.numPages;i++){
+    const pg=await pdf.getPage(i);
+    const c=await pg.getTextContent();
+    text+=`--- Page ${i} ---\n${c.items.map(x=>x.str).join(' ')}\n\n`;
   }
+  return{content:text,meta:`${pdf.numPages} pages`};
 }
 
-// ── SEND ─────────────────────────────────────────────────────────────────────
-async function send() {
-  const text = inp.value.trim();
-  if ((!text && !att) || loading) return;
+// ── PROCESS WORD ─────────────────────────────────────────────────────────────
+async function processWord(file){
+  showStatus("📘 Reading Word doc...");
+  const buf=await readBuf(file);
+  const r=await mammoth.extractRawText({arrayBuffer:buf});
+  return{content:`[Word: ${file.name}]\n\n${r.value}`,meta:'Word document'};
+}
 
-  loading = true;
-  sendBtn.disabled = true;
-  inp.value = "";
-  inp.style.height = "40px";
-  hideErr();
+// ── MAIN FILE HANDLER ─────────────────────────────────────────────────────────
+async function handleFile(e){
+  const file=e.target.files[0];if(!file)return;
+  e.target.value="";
+  processing=true;updateBtn();hideErr();
 
-  const displayText = text || `Please review: ${att.name}`;
-  const fileInfo    = att ? { name: att.name, mime: att.mime_type } : null;
-  const imgDataUrl  = att?.isImage ? att.dataUrl : null;
-  const userContent = buildUserContent(text, att);
+  try{
+    if(isImage(file.name,file.type)){
+      showStatus("🖼️ Loading image...");
+      const dataUrl=await readURL(file);
+      att={name:file.name,content:dataUrl.split(',')[1],isImage:true,
+           dataUrl,mediaType:file.type||'image/jpeg',meta:formatSize(file.size)};
+      showFP(file.name,formatSize(file.size),dataUrl);
 
-  removeFile();
+    }else if(isZip(file.name)){
+      const{content,meta}=await processZip(file);
+      att={name:file.name,content,isImage:false,meta};
+      showFP(file.name,meta,null);
 
-  msgs.push({ role: "user", content: userContent });
-  addMsg("user", displayText, fileInfo, imgDataUrl);
+    }else if(isPDF(file.name)){
+      const{content,meta}=await processPDF(file);
+      att={name:file.name,content,isImage:false,meta};
+      showFP(file.name,meta,null);
 
-  const typingEl = document.createElement("div");
-  typingEl.className = "typing";
-  typingEl.textContent = "Claude is thinking...";
-  msgsEl.appendChild(typingEl);
-  msgsEl.scrollTop = msgsEl.scrollHeight;
+    }else if(isWord(file.name)){
+      const{content,meta}=await processWord(file);
+      att={name:file.name,content,isImage:false,meta};
+      showFP(file.name,meta,null);
 
-  try {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: SYSTEM },
-          ...msgs
-        ]
-      })
-    });
-
-    const data = await res.json();
-    typingEl.remove();
-
-    if (!res.ok || data.error) {
-      showErr(data.error || "Something went wrong.");
-      msgs.pop();
-    } else {
-      msgs.push({ role: "assistant", content: data.reply });
-      addMsg("assistant", data.reply);
+    }else{
+      // Plain text / code file
+      showStatus("📄 Reading file...");
+      const text=await readText(file);
+      att={name:file.name,content:`[File: ${file.name}]\n\`\`\`\n${text}\n\`\`\``,
+           isImage:false,meta:formatSize(file.size)};
+      showFP(file.name,formatSize(file.size),null);
     }
 
-  } catch (err) {
-    typingEl.remove();
-    showErr("Connection error: " + err.message);
-    msgs.pop();
-  } finally {
-    loading = false;
-    updateBtn();
+  }catch(err){
+    showErr("Could not read file: "+err.message);
+  }finally{
+    hideStatus();processing=false;updateBtn();
   }
+}
+
+function showFP(name,meta,dataUrl){
+  fpIcon.textContent=getIcon(name);
+  fpName.textContent=name;
+  fpMeta.textContent=meta;
+  if(dataUrl){fpThumb.src=dataUrl;fpThumb.style.display="block";}
+  else{fpThumb.style.display="none";}
+  fpBar.classList.add("on");
+}
+function removeFile(){att=null;fpBar.classList.remove("on");fpThumb.style.display="none";updateBtn();}
+
+function escH(t){return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+function addMsg(role,text,fileInfo,imgDataUrl){
+  emptyEl.style.display="none";clearBtn.style.display="block";
+  const div=document.createElement("div");div.className=`msg msg--${role}`;
+  let html=`<div class="msg-label">${role==="user"?"You":"Claude"}</div>`;
+  if(fileInfo){
+    if(imgDataUrl) html+=`<img src="${imgDataUrl}" class="img-preview-msg"/>`;
+    html+=`<div class="file-badge">${getIcon(fileInfo.name)} ${escH(fileInfo.name)} ${fileInfo.meta?'· '+escH(fileInfo.meta):''}</div>`;
+  }
+  html+=`<div class="msg-bubble">${escH(text)}</div>`;
+  div.innerHTML=html;msgsEl.appendChild(div);msgsEl.scrollTop=msgsEl.scrollHeight;
+}
+
+function clearChat(){msgs=[];msgsEl.innerHTML="";msgsEl.appendChild(emptyEl);emptyEl.style.display="block";clearBtn.style.display="none";hideErr();removeFile();}
+
+async function send(){
+  const text=inp.value.trim();
+  if((!text&&!att)||loading)return;
+  loading=true;sendBtn.disabled=true;inp.value="";inp.style.height="40px";hideErr();
+
+  const displayText=text||(att?`Please review: ${att.name}`:"");
+  const fileInfo=att?{name:att.name,meta:att.meta}:null;
+  const imgDataUrl=att?.isImage?att.dataUrl:null;
+
+  // Build API content
+  let apiContent;
+  if(att&&att.isImage){
+    apiContent=[
+      {type:"image",source:{type:"base64",media_type:att.mediaType,data:att.content}},
+      {type:"text",text:text||"Please describe and analyse this image."}
+    ];
+  }else if(att){
+    const userText=text||"Please review this file and help me.";
+    apiContent=att.content+"\n\n"+userText;
+  }else{
+    apiContent=text;
+  }
+
+  removeFile();
+  msgs.push({role:"user",content:apiContent});
+  addMsg("user",displayText,fileInfo,imgDataUrl);
+
+  const t=document.createElement("div");t.className="typing";t.textContent="Claude is thinking...";
+  msgsEl.appendChild(t);msgsEl.scrollTop=msgsEl.scrollHeight;
+
+  try{
+    const res=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({messages:[{role:"system",content:SYSTEM},...msgs]})});
+    const data=await res.json();t.remove();
+    if(!res.ok||data.error){showErr(data.error||"Something went wrong.");msgs.pop();}
+    else{msgs.push({role:"assistant",content:data.reply});addMsg("assistant",data.reply);}
+  }catch(e){t.remove();showErr("Connection error: "+e.message);msgs.pop();}
+  finally{loading=false;updateBtn();}
 }
 </script>
 </body>
