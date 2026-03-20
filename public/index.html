@@ -3,355 +3,700 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Notes Tool</title>
-  <script src="https://xenova.github.io/unarchiver.js/dist/unarchiver.min.js"></script>
+  <title>Eclipse IDE</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;background:#f5f5f5;color:#1a1a1a;height:100vh;display:flex;flex-direction:column}
-    .topbar{background:#fff;border-bottom:1px solid #ddd;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-    .topbar-title{font-size:14px;font-weight:600;color:#333}
-    .btn-clear{font-size:12px;color:#888;background:none;border:1px solid #ddd;border-radius:4px;padding:4px 10px;cursor:pointer;display:none}
-    .btn-clear:hover{background:#f0f0f0}
-    .messages-area{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
-    .empty{margin:auto;text-align:center;color:#aaa;font-size:13px;line-height:2.4}
-    .msg{max-width:820px;width:100%;display:flex;flex-direction:column}
-    .msg--user{align-self:flex-end;align-items:flex-end}
-    .msg--assistant{align-self:flex-start;align-items:flex-start}
-    .msg-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;color:#999}
-    .msg-bubble{padding:10px 14px;border-radius:6px;line-height:1.6;font-size:14px;white-space:pre-wrap;word-break:break-word;max-width:100%}
-    .msg--user .msg-bubble{background:#1a73e8;color:#fff;border-bottom-right-radius:2px}
-    .msg--assistant .msg-bubble{background:#fff;border:1px solid #e0e0e0;color:#1a1a1a;border-bottom-left-radius:2px}
-    .file-badge{font-size:11px;border-radius:4px;padding:3px 8px;margin-bottom:5px;display:inline-flex;align-items:center;gap:4px;background:#e8f0fe;color:#1a73e8;border:1px solid #c5d8fd}
-    .img-preview-msg{max-width:260px;max-height:180px;border-radius:6px;margin-bottom:6px;border:1px solid #e0e0e0;object-fit:contain}
-    .typing{align-self:flex-start;padding:10px 14px;background:#fff;border:1px solid #e0e0e0;border-radius:6px;color:#aaa;font-size:13px;font-style:italic}
-    .error-bar{background:#fff3f3;border:1px solid #f5c2c2;color:#c0392b;font-size:13px;padding:8px 16px;flex-shrink:0;display:none}
-    .status-bar{background:#fff8e1;border-top:1px solid #ffe082;color:#f57f17;font-size:12px;padding:6px 20px;flex-shrink:0;display:none}
-    .fp-bar{padding:0 20px 8px;background:#fff;display:none}
-    .fp-bar.on{display:block}
-    .fp{background:#f8f9fa;border:1px solid #ddd;border-radius:6px;padding:6px 12px;font-size:12px;color:#555;display:flex;align-items:center;gap:8px}
-    .fp-thumb{max-width:36px;max-height:36px;border-radius:3px;object-fit:cover;display:none}
-    .btn-rm{background:none;border:none;cursor:pointer;color:#aaa;font-size:20px;line-height:1;margin-left:auto}
-    .btn-rm:hover{color:#c0392b}
-    .input-area{background:#fff;border-top:1px solid #ddd;padding:12px 20px;display:flex;gap:8px;align-items:flex-end;flex-shrink:0}
-    #fileInput{display:none}
-    .btn-attach{background:#f0f0f0;color:#555;border:1px solid #ddd;border-radius:6px;width:40px;height:40px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .btn-attach:hover{background:#e0e0e0}
-    .btn-attach:disabled{opacity:.5;cursor:not-allowed}
-    textarea{flex:1;resize:none;border:1px solid #ccc;border-radius:6px;padding:9px 12px;font-size:14px;font-family:inherit;line-height:1.5;min-height:40px;max-height:140px;outline:none;overflow-y:auto;color:#1a1a1a;background:#fafafa}
-    textarea:focus{border-color:#1a73e8;background:#fff}
-    .btn-send{background:#1a73e8;color:#fff;border:none;border-radius:6px;padding:9px 18px;font-size:14px;font-weight:500;cursor:pointer;height:40px;white-space:nowrap;flex-shrink:0}
-    .btn-send:hover{background:#1558b0}
-    .btn-send:disabled{background:#ccc;cursor:not-allowed}
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+    :root {
+      --bg:        #1e1e1e;
+      --bg2:       #252526;
+      --bg3:       #2d2d30;
+      --border:    #3c3c3c;
+      --text:      #d4d4d4;
+      --muted:     #858585;
+      --blue:      #569cd6;
+      --green:     #6a9955;
+      --yellow:    #dcdcaa;
+      --orange:    #ce9178;
+      --purple:    #c586c0;
+      --cyan:      #4ec9b0;
+      --red:       #f44747;
+      --tab-active:#1e1e1e;
+      --tab-bg:    #2d2d30;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── TITLE BAR ── */
+    .titlebar {
+      background: #323233;
+      padding: 4px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      flex-shrink: 0;
+      border-bottom: 1px solid #111;
+      user-select: none;
+    }
+    .titlebar-title { color: var(--text); font-size: 12px; }
+    .titlebar-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+
+    /* ── MENU BAR ── */
+    .menubar {
+      background: #3c3c3c;
+      padding: 2px 8px;
+      display: flex;
+      gap: 2px;
+      font-size: 12px;
+      flex-shrink: 0;
+      border-bottom: 1px solid #111;
+      user-select: none;
+    }
+    .menu-item {
+      padding: 2px 8px;
+      color: var(--text);
+      cursor: default;
+      border-radius: 2px;
+    }
+    .menu-item:hover { background: #505050; }
+
+    /* ── TOOLBAR ── */
+    .toolbar {
+      background: var(--bg3);
+      padding: 3px 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+      user-select: none;
+    }
+    .toolbar-btn {
+      padding: 2px 6px;
+      background: none;
+      border: 1px solid transparent;
+      border-radius: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      cursor: default;
+      font-family: inherit;
+    }
+    .toolbar-btn:hover { border-color: var(--border); background: #404040; color: var(--text); }
+    .toolbar-sep { width: 1px; height: 16px; background: var(--border); margin: 0 2px; }
+
+    /* ── MAIN LAYOUT ── */
+    .workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── LEFT PANEL (Package Explorer) ── */
+    .left-panel {
+      width: 200px;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 4px 8px;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+    .panel-header-title { color: var(--text); font-weight: 500; }
+    .file-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 0;
+      font-size: 12px;
+    }
+    .tree-item {
+      padding: 2px 8px 2px 16px;
+      color: var(--text);
+      cursor: default;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      user-select: none;
+    }
+    .tree-item:hover { background: #2a2d2e; }
+    .tree-item.selected { background: #094771; }
+    .tree-item.folder { color: var(--yellow); padding-left: 8px; }
+    .tree-item.java { color: var(--cyan); }
+    .tree-item.config { color: var(--orange); }
+    .tree-icon { font-size: 10px; }
+
+    /* ── EDITOR AREA ── */
+    .editor-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── TABS ── */
+    .tabs {
+      display: flex;
+      background: var(--tab-bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      overflow-x: auto;
+      user-select: none;
+    }
+    .tab {
+      padding: 5px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      border-right: 1px solid var(--border);
+      cursor: default;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      border-top: 2px solid transparent;
+    }
+    .tab.active {
+      background: var(--tab-active);
+      color: var(--text);
+      border-top-color: #007acc;
+    }
+    .tab .java-icon { color: var(--cyan); font-size: 10px; }
+
+    /* ── CODE EDITOR (message display) ── */
+    .code-editor {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+      background: var(--bg);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .code-line {
+      display: flex;
+      min-height: 20px;
+    }
+    .line-num {
+      width: 44px;
+      text-align: right;
+      padding-right: 16px;
+      color: #3c3c3c;
+      user-select: none;
+      flex-shrink: 0;
+      font-size: 12px;
+    }
+    .line-content {
+      flex: 1;
+      padding-right: 16px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* question lines = code comment style */
+    .line-comment .line-content { color: var(--green); }
+    .line-comment .line-num { color: #3c3c3c; }
+
+    /* response lines = normal code */
+    .line-response .line-content { color: var(--text); }
+
+    /* system/info lines */
+    .line-info .line-content { color: var(--muted); font-size: 11px; }
+
+    /* file badge inline */
+    .line-file .line-content { color: var(--orange); }
+
+    .empty-editor {
+      padding: 40px 60px;
+      color: #3c3c3c;
+      font-size: 13px;
+      line-height: 2;
+    }
+    .empty-editor .hint { color: #2d2d2d; }
+
+    /* ── BOTTOM SPLIT (Console) ── */
+    .bottom-panel {
+      height: 160px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .console-tabs {
+      display: flex;
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      user-select: none;
+    }
+    .console-tab {
+      padding: 3px 12px;
+      font-size: 11px;
+      color: var(--muted);
+      border-right: 1px solid var(--border);
+      cursor: default;
+    }
+    .console-tab.active { color: var(--text); border-bottom: 2px solid #007acc; }
+
+    /* ── INPUT AREA (looks like find bar) ── */
+    .input-row {
+      display: flex;
+      align-items: center;
+      padding: 6px 8px;
+      gap: 6px;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .input-prompt {
+      color: var(--green);
+      font-size: 12px;
+      flex-shrink: 0;
+      user-select: none;
+    }
+    textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      resize: none;
+      min-height: 20px;
+      max-height: 80px;
+      line-height: 1.5;
+      overflow-y: auto;
+    }
+    textarea::placeholder { color: #3c3c3c; }
+
+    .input-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    #fileInput { display: none; }
+    .btn-attach {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      padding: 2px 6px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-attach:hover { background: #404040; color: var(--text); }
+    .btn-attach:disabled { opacity: 0.4; cursor: default; }
+    .btn-run {
+      background: #007acc;
+      border: none;
+      border-radius: 2px;
+      color: #fff;
+      font-size: 11px;
+      padding: 3px 10px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-run:hover { background: #1b8add; }
+    .btn-run:disabled { background: #3c3c3c; color: var(--muted); cursor: default; }
+
+    /* status bar */
+    .statusbar {
+      background: #007acc;
+      padding: 2px 12px;
+      font-size: 11px;
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    /* error / status */
+    .err-line { color: var(--red) !important; }
+    .processing-line { color: var(--yellow) !important; }
+
+    /* file preview strip */
+    .fp-strip {
+      background: var(--bg3);
+      border-top: 1px solid var(--border);
+      padding: 4px 8px;
+      font-size: 11px;
+      color: var(--orange);
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+    .fp-strip.on { display: flex; }
+    .fp-name { color: var(--cyan); }
+    .fp-meta { color: var(--muted); }
+    .btn-rm { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; margin-left: auto; }
+    .btn-rm:hover { color: var(--red); }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg2); }
+    ::-webkit-scrollbar-thumb { background: #424242; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #555; }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <span class="topbar-title">Notes Tool</span>
-    <button class="btn-clear" id="clearBtn" onclick="clearChat()">Clear</button>
-  </div>
 
-  <div class="messages-area" id="messages">
-    <div class="empty" id="emptyState">
-      Type a question or attach any file<br>
-      <span style="font-size:12px">Enter to send · Shift+Enter for new line</span><br>
-      <span style="font-size:11px;color:#ccc">ZIP · RAR · PDF · Word · Images · Code · Any file</span>
+<!-- TITLE BAR -->
+<div class="titlebar">
+  <div class="titlebar-dot"></div>
+  <div class="titlebar-dot"></div>
+  <div class="titlebar-dot"></div>
+  <span class="titlebar-title">Eclipse IDE — MobileService — Java</span>
+</div>
+
+<!-- MENU BAR -->
+<div class="menubar">
+  <div class="menu-item">File</div>
+  <div class="menu-item">Edit</div>
+  <div class="menu-item">Source</div>
+  <div class="menu-item">Refactor</div>
+  <div class="menu-item">Navigate</div>
+  <div class="menu-item">Search</div>
+  <div class="menu-item">Project</div>
+  <div class="menu-item">Run</div>
+  <div class="menu-item">Window</div>
+  <div class="menu-item">Help</div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <button class="toolbar-btn">▶ Run</button>
+  <button class="toolbar-btn">⬛ Stop</button>
+  <div class="toolbar-sep"></div>
+  <button class="toolbar-btn">⟳ Build</button>
+  <button class="toolbar-btn">🔍 Search</button>
+  <div class="toolbar-sep"></div>
+  <button class="toolbar-btn">⬅ Back</button>
+  <button class="toolbar-btn">➡ Forward</button>
+</div>
+
+<!-- WORKSPACE -->
+<div class="workspace">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+    <div class="panel-header">
+      <span class="panel-header-title">Package Explorer</span>
+      <span>⋯</span>
+    </div>
+    <div class="file-tree">
+      <div class="tree-item folder">▼ 📁 MobileService</div>
+      <div class="tree-item folder" style="padding-left:20px">▼ 📁 src</div>
+      <div class="tree-item folder" style="padding-left:28px">▼ 📁 com.infy</div>
+      <div class="tree-item java" style="padding-left:36px">◆ MobileServiceImpl.java</div>
+      <div class="tree-item java" style="padding-left:36px">◆ Validator.java</div>
+      <div class="tree-item java" style="padding-left:36px">◆ ServiceReport.java</div>
+      <div class="tree-item java selected" style="padding-left:36px">◆ MobileServiceTest.java</div>
+      <div class="tree-item folder" style="padding-left:20px">▼ 📁 resources</div>
+      <div class="tree-item config" style="padding-left:28px">⚙ configuration.properties</div>
+      <div class="tree-item config" style="padding-left:28px">⚙ log4j2.properties</div>
+      <div class="tree-item folder" style="padding-left:20px">▼ 📁 JRE System Library</div>
+      <div class="tree-item" style="padding-left:28px;color:#858585">▸ rt.jar</div>
     </div>
   </div>
 
-  <div class="error-bar" id="errorBar"></div>
-  <div class="status-bar" id="statusBar"></div>
+  <!-- EDITOR + CONSOLE -->
+  <div class="editor-area">
 
-  <div class="fp-bar" id="fpBar">
-    <div class="fp">
-      <img id="fpThumb" class="fp-thumb"/>
-      <span id="fpIcon">📎</span>
-      <span id="fpName"></span>
-      <span id="fpMeta" style="color:#aaa;font-size:11px"></span>
-      <button class="btn-rm" onclick="removeFile()">×</button>
+    <!-- TABS -->
+    <div class="tabs">
+      <div class="tab"><span class="java-icon">◆</span> MobileServiceImpl.java</div>
+      <div class="tab"><span class="java-icon">◆</span> Validator.java</div>
+      <div class="tab active"><span class="java-icon">◆</span> MobileServiceTest.java</div>
+      <div class="tab"><span style="color:#ce9178;font-size:10px">⚙</span> configuration.properties</div>
     </div>
-  </div>
 
-  <input type="file" id="fileInput" accept="*/*" onchange="handleFile(event)"/>
+    <!-- CODE EDITOR (messages appear here) -->
+    <div class="code-editor" id="editor">
+      <div class="empty-editor" id="emptyState">
+        <span style="color:#3c3c3c">// MobileServiceTest.java</span><br>
+        <span style="color:#2d2d2d">// Start typing below to query the assistant</span><br><br>
+        <span class="hint">// Ctrl+Space for suggestions</span>
+      </div>
+    </div>
 
-  <div class="input-area">
-    <button class="btn-attach" id="attachBtn" onclick="document.getElementById('fileInput').click()" title="Attach any file">📎</button>
-    <textarea id="inp" placeholder="Type here..." rows="1" oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
-    <button class="btn-send" id="sendBtn" onclick="send()" disabled>Send</button>
+    <!-- BOTTOM PANEL -->
+    <div class="bottom-panel">
+      <div class="console-tabs">
+        <div class="console-tab active">Console</div>
+        <div class="console-tab">Problems</div>
+        <div class="console-tab">Javadoc</div>
+        <div class="console-tab">Declaration</div>
+      </div>
+
+      <!-- FILE PREVIEW STRIP -->
+      <div class="fp-strip" id="fpStrip">
+        <span>📎</span>
+        <span id="fpName" class="fp-name"></span>
+        <span id="fpMeta" class="fp-meta"></span>
+        <button class="btn-rm" onclick="removeFile()">×</button>
+      </div>
+
+      <!-- STATUS / ERROR LINE -->
+      <div style="padding:3px 8px;font-size:11px;color:#858585;background:#1e1e1e;border-bottom:1px solid #3c3c3c;flex-shrink:0" id="statusLine">
+        &gt; Console ready.
+      </div>
+
+      <!-- INPUT ROW -->
+      <div class="input-row">
+        <span class="input-prompt">//</span>
+        <textarea id="inp" placeholder="// ask anything about your code..." rows="1"
+          oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+        <div class="input-actions">
+          <input type="file" id="fileInput" accept="*/*" onchange="handleFile(event)"/>
+          <button class="btn-attach" id="attachBtn" onclick="document.getElementById('fileInput').click()">📎 Attach</button>
+          <button class="btn-run" id="runBtn" onclick="send()" disabled>▶ Run</button>
+        </div>
+      </div>
+    </div>
+
   </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="statusbar">
+  <span id="statusLeft">MobileServiceTest.java — Java 17 — UTF-8</span>
+  <span id="statusRight">Ln 1, Col 1 &nbsp;|&nbsp; Smart Insert</span>
+</div>
 
 <script>
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 const SYSTEM=`You are a helpful assistant specialising in Java, Spring Boot, and software development.
-When given a project structure with multiple files, understand how they relate to each other before answering.
-Be clear, concise and accurate.`;
+When given code or project files analyse them carefully before answering.
+Be concise and accurate.`;
 
-let msgs=[],loading=false,processing=false;
-let att=null; // { name, content, isImage, dataUrl, meta }
+let msgs=[],loading=false,processing=false,lineCount=1;
+let att=null;
 
-const msgsEl   =document.getElementById("messages");
-const inp      =document.getElementById("inp");
-const sendBtn  =document.getElementById("sendBtn");
-const errorBar =document.getElementById("errorBar");
-const statusBar=document.getElementById("statusBar");
-const emptyEl  =document.getElementById("emptyState");
-const clearBtn =document.getElementById("clearBtn");
-const fpBar    =document.getElementById("fpBar");
-const fpName   =document.getElementById("fpName");
-const fpIcon   =document.getElementById("fpIcon");
-const fpMeta   =document.getElementById("fpMeta");
-const fpThumb  =document.getElementById("fpThumb");
-const attachBtn=document.getElementById("attachBtn");
+const editorEl  = document.getElementById("editor");
+const inp       = document.getElementById("inp");
+const runBtn    = document.getElementById("runBtn");
+const attachBtn = document.getElementById("attachBtn");
+const emptyEl   = document.getElementById("emptyState");
+const fpStrip   = document.getElementById("fpStrip");
+const fpName    = document.getElementById("fpName");
+const fpMeta    = document.getElementById("fpMeta");
+const statusLine= document.getElementById("statusLine");
+const statusLeft= document.getElementById("statusLeft");
 
-inp.addEventListener("input",updateBtn);
-function updateBtn(){sendBtn.disabled=(!inp.value.trim()&&!att)||loading||processing;attachBtn.disabled=processing||loading;}
-function autoResize(el){el.style.height="40px";el.style.height=Math.min(el.scrollHeight,140)+"px";}
-function handleKey(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();if(!sendBtn.disabled)send();}}
-function showErr(m){errorBar.textContent="⚠ "+m;errorBar.style.display="block";}
-function hideErr(){errorBar.style.display="none";}
-function showStatus(m){statusBar.textContent=m;statusBar.style.display="block";}
-function hideStatus(){statusBar.style.display="none";}
+inp.addEventListener("input", updateBtn);
+function updateBtn(){ runBtn.disabled=(!inp.value.trim()&&!att)||loading||processing; attachBtn.disabled=processing||loading; }
+function autoResize(el){ el.style.height="20px"; el.style.height=Math.min(el.scrollHeight,80)+"px"; }
+function handleKey(e){ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); if(!runBtn.disabled) send(); } }
 
-// ── FILE TYPE HELPERS ────────────────────────────────────────────────────────
-function getExt(name){return name.split('.').pop().toLowerCase();}
-function isZip(name){return['zip','rar','7z','tar','gz','bz2','xz','cab','iso','lzma'].includes(getExt(name));}
-function isImage(name,mime){return['jpg','jpeg','png','gif','webp','bmp','svg'].includes(getExt(name))||mime.startsWith('image/');}
-function isPDF(name){return getExt(name)==='pdf';}
-function isWord(name){return['doc','docx'].includes(getExt(name));}
-
-function getIcon(name){
-  const e=getExt(name);
-  if(['zip','rar','7z','tar','gz'].includes(e)) return'🗜️';
-  if(e==='pdf') return'📕';
-  if(['doc','docx'].includes(e)) return'📘';
-  if(['jpg','jpeg','png','gif','webp'].includes(e)) return'🖼️';
-  if(['java','py','js','ts','cpp','c','cs'].includes(e)) return'☕';
-  if(['json','xml','yml','yaml'].includes(e)) return'⚙️';
-  return'📄';
+function setStatus(msg, color="#858585"){
+  statusLine.style.color = color;
+  statusLine.textContent = "> " + msg;
 }
 
-function formatSize(b){
-  if(b<1024) return b+' B';
-  if(b<1024*1024) return (b/1024).toFixed(1)+' KB';
-  return (b/(1024*1024)).toFixed(1)+' MB';
+// ── ADD LINES TO EDITOR ───────────────────────────────────────────────────────
+function addLines(lines, type){
+  emptyEl.style.display = "none";
+  lines.forEach(text => {
+    const row = document.createElement("div");
+    row.className = "code-line line-" + type;
+    row.innerHTML = `<span class="line-num">${lineCount++}</span><span class="line-content">${escH(text)}</span>`;
+    editorEl.appendChild(row);
+  });
+  editorEl.scrollTop = editorEl.scrollHeight;
 }
 
-// ── READERS ──────────────────────────────────────────────────────────────────
-function readText(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=()=>rej(new Error("fail"));r.readAsText(f);});}
-function readURL(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=()=>rej(new Error("fail"));r.readAsDataURL(f);});}
-function readBuf(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=()=>rej(new Error("fail"));r.readAsArrayBuffer(f);});}
+function addBlank(){
+  const row = document.createElement("div");
+  row.className = "code-line line-info";
+  row.innerHTML = `<span class="line-num">${lineCount++}</span><span class="line-content"> </span>`;
+  editorEl.appendChild(row);
+}
 
-// ── SKIP THESE FILES IN ZIP ───────────────────────────────────────────────────
-const SKIP_PATTERNS=[
-  /^__MACOSX/,/\.DS_Store$/,/Thumbs\.db$/,
-  /\.class$/,/\.jar$/,/\.war$/,/\.ear$/,
-  /\/target\//,/\/\.git\//,/\/\.idea\//,/\/\.vscode\//,
-  /\/node_modules\//,/\/bin\//,/\/out\//,/\/build\//,
-];
-function shouldSkip(path){return SKIP_PATTERNS.some(p=>p.test(path));}
+function escH(t){ return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
-// ── TEXT EXTENSIONS ───────────────────────────────────────────────────────────
-const TEXT_EXTS=['java','js','ts','py','c','cpp','cs','go','rb','php','swift','kt','rs',
-  'sh','bash','sql','html','css','xml','json','yaml','yml','md','txt','csv',
-  'properties','env','toml','ini','cfg','gradle','xml','pom','log','jsp','ftl'];
-function isTextFile(name){return TEXT_EXTS.includes(getExt(name));}
+// ── FILE HELPERS ──────────────────────────────────────────────────────────────
+function getExt(n){ return n.split('.').pop().toLowerCase(); }
+function isArchive(n){ return['zip','rar','7z','tar','gz','bz2'].includes(getExt(n)); }
+function isImg(n,m){ return['jpg','jpeg','png','gif','webp','bmp'].includes(getExt(n))||m.startsWith('image/'); }
+function isPDF(n){ return getExt(n)==='pdf'; }
+function isWord(n){ return['doc','docx'].includes(getExt(n)); }
 
-// ── PROCESS ANY ARCHIVE (zip, rar, 7z, tar, gz etc.) ─────────────────────────
-async function processZip(file){
-  showStatus("📦 Extracting "+file.name+"...");
-  console.log("[Archive] Starting extraction of:", file.name, "size:", file.size);
+const TEXT_EXTS=['java','js','ts','py','c','cpp','cs','go','rb','php','kt','rs','sh',
+  'sql','html','css','xml','json','yaml','yml','md','txt','csv','properties','env',
+  'toml','ini','cfg','gradle','pom','log','jsp','ftl','bash'];
+function isText(n){ return TEXT_EXTS.includes(getExt(n)); }
 
-  let archive;
-  try {
-    archive = await Unarchiver.open(file);
-    console.log("[Archive] Opened successfully, total entries:", archive.entries.length);
-  } catch(e) {
-    console.error("[Archive] Failed to open:", e);
-    throw new Error("Could not open archive: " + e.message);
-  }
+const SKIP_RE=[/^__MACOSX/,/\.DS_Store$/,/\.class$/,/\.jar$/,/\.war$/,
+  /\/target\//,/\/\.git\//,/\/\.idea\//,/\/node_modules\//,/\/bin\//,/\/out\//];
+function shouldSkip(p){ return SKIP_RE.some(r=>r.test(p)); }
 
-  const allEntries = archive.entries.filter(e => {
-    const keep = e.is_file && !shouldSkip(e.name);
-    if(!keep) console.log("[Archive] Skipping:", e.name);
-    return keep;
-  });
-  console.log("[Archive] Files to process:", allEntries.length);
+function fmtSize(b){ if(b<1024)return b+' B'; if(b<1048576)return(b/1024).toFixed(1)+' KB'; return(b/1048576).toFixed(1)+' MB'; }
 
-  // Sort — Java files first
-  allEntries.sort((a,b)=>{
-    const aJ=a.name.endsWith('.java')?0:1;
-    const bJ=b.name.endsWith('.java')?0:1;
-    return aJ-bJ||a.name.localeCompare(b.name);
-  });
+function readText(f){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=()=>rej(new Error("fail")); r.readAsText(f); }); }
+function readURL(f){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=()=>rej(new Error("fail")); r.readAsDataURL(f); }); }
+function readBuf(f){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=()=>rej(new Error("fail")); r.readAsArrayBuffer(f); }); }
 
-  const treePaths = allEntries.map(e => "  "+e.name);
-  let content = `[Archive: ${file.name}]\n`;
-  content += `Total files: ${allEntries.length}\n\n`;
-  content += `Project Structure:\n${treePaths.join('\n')}\n\n`;
-  content += "=".repeat(60)+"\n\n";
+// ── PROCESS ARCHIVE ───────────────────────────────────────────────────────────
+async function processArchive(file){
+  setStatus("Extracting " + file.name + "...", "#dcdcaa");
+  const buf = await readBuf(file);
+  const zip = await JSZip.loadAsync(buf);
 
-  let processed = 0;
-  for(const entry of allEntries){
-    const shortName = entry.name.split('/').pop();
-    console.log(`[Archive] Processing ${++processed}/${allEntries.length}: ${entry.name} — isText: ${isTextFile(entry.name)}`);
-    showStatus(`📦 Reading ${processed}/${allEntries.length}: ${shortName}...`);
+  const entries=[];
+  zip.forEach((path,entry)=>{ if(!entry.dir&&!shouldSkip(path)) entries.push({path,entry}); });
+  entries.sort((a,b)=>{ const aJ=a.path.endsWith('.java')?0:1,bJ=b.path.endsWith('.java')?0:1; return aJ-bJ||a.path.localeCompare(b.path); });
 
-    if(isTextFile(entry.name)){
+  let content=`[Archive: ${file.name} — ${entries.length} files]\n\nStructure:\n`;
+  entries.forEach(e=>{ content+="  "+e.path+"\n"; });
+  content+="\n"+"=".repeat(60)+"\n\n";
+
+  for(let i=0;i<entries.length;i++){
+    const {path,entry}=entries[i];
+    setStatus(`Reading ${i+1}/${entries.length}: ${path.split('/').pop()}...`, "#dcdcaa");
+    if(isText(path)){
       try{
-        // Timeout per file — 5 seconds max
-        const text = await Promise.race([
-          entry.read().then(f => f.text()),
-          new Promise((_,rej) => setTimeout(() => rej(new Error("timeout")), 5000))
-        ]);
-        console.log(`[Archive] Read OK: ${entry.name} — ${text.length} chars`);
-        content += `=== ${entry.name} ===\n${text}\n\n`;
-      }catch(e){
-        console.warn(`[Archive] Failed to read ${entry.name}:`, e.message);
-        content += `=== ${entry.name} ===\n[Could not read: ${e.message}]\n\n`;
-      }
+        const txt=await Promise.race([entry.async("string"),new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),5000))]);
+        content+=`=== ${path} ===\n${txt}\n\n`;
+      }catch(e){ content+=`=== ${path} ===\n[skipped: ${e.message}]\n\n`; }
     }else{
-      console.log(`[Archive] Binary skip: ${entry.name}`);
-      content += `=== ${entry.name} ===\n[Binary file — skipped]\n\n`;
+      content+=`=== ${path} ===\n[binary — skipped]\n\n`;
     }
   }
-
-  console.log("[Archive] Extraction complete. Content length:", content.length);
-  return{content, meta:`${allEntries.length} files extracted`};
-}
-
-// ── PROCESS PDF ───────────────────────────────────────────────────────────────
-async function processPDF(file){
-  showStatus("📕 Reading PDF...");
-  const buf=await readBuf(file);
-  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
-  let text=`[PDF: ${file.name} — ${pdf.numPages} page(s)]\n\n`;
-  for(let i=1;i<=pdf.numPages;i++){
-    const pg=await pdf.getPage(i);
-    const c=await pg.getTextContent();
-    text+=`--- Page ${i} ---\n${c.items.map(x=>x.str).join(' ')}\n\n`;
-  }
-  return{content:text,meta:`${pdf.numPages} pages`};
-}
-
-// ── PROCESS WORD ─────────────────────────────────────────────────────────────
-async function processWord(file){
-  showStatus("📘 Reading Word doc...");
-  const buf=await readBuf(file);
-  const r=await mammoth.extractRawText({arrayBuffer:buf});
-  return{content:`[Word: ${file.name}]\n\n${r.value}`,meta:'Word document'};
+  return{content,meta:`${entries.length} files`};
 }
 
 // ── MAIN FILE HANDLER ─────────────────────────────────────────────────────────
 async function handleFile(e){
-  const file=e.target.files[0];if(!file)return;
-  e.target.value="";
-  processing=true;updateBtn();hideErr();
+  const file=e.target.files[0]; if(!file)return;
+  e.target.value=""; processing=true; updateBtn(); setStatus("Reading "+file.name+"...", "#dcdcaa");
 
   try{
-    if(isImage(file.name,file.type)){
-      showStatus("🖼️ Loading image...");
-      const dataUrl=await readURL(file);
-      att={name:file.name,content:dataUrl.split(',')[1],isImage:true,
-           dataUrl,mediaType:file.type||'image/jpeg',meta:formatSize(file.size)};
-      showFP(file.name,formatSize(file.size),dataUrl);
-
-    }else if(isZip(file.name)){
-      const{content,meta}=await processZip(file);
+    if(isImg(file.name,file.type)){
+      const url=await readURL(file);
+      att={name:file.name,content:url.split(',')[1],isImage:true,dataUrl:url,
+           mediaType:file.type||'image/jpeg',meta:fmtSize(file.size)};
+    }else if(isArchive(file.name)){
+      const{content,meta}=await processArchive(file);
       att={name:file.name,content,isImage:false,meta};
-      showFP(file.name,meta,null);
-
     }else if(isPDF(file.name)){
-      const{content,meta}=await processPDF(file);
-      att={name:file.name,content,isImage:false,meta};
-      showFP(file.name,meta,null);
-
+      setStatus("Reading PDF...", "#dcdcaa");
+      const buf=await readBuf(file);
+      const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+      let txt=`[PDF: ${file.name} — ${pdf.numPages} pages]\n\n`;
+      for(let i=1;i<=pdf.numPages;i++){
+        const pg=await pdf.getPage(i); const c=await pg.getTextContent();
+        txt+=`--- Page ${i} ---\n${c.items.map(x=>x.str).join(' ')}\n\n`;
+      }
+      att={name:file.name,content:txt,isImage:false,meta:`${pdf.numPages} pages`};
     }else if(isWord(file.name)){
-      const{content,meta}=await processWord(file);
-      att={name:file.name,content,isImage:false,meta};
-      showFP(file.name,meta,null);
-
+      setStatus("Reading Word doc...", "#dcdcaa");
+      const buf=await readBuf(file);
+      const r=await mammoth.extractRawText({arrayBuffer:buf});
+      att={name:file.name,content:`[Word: ${file.name}]\n\n${r.value}`,isImage:false,meta:'Word doc'};
     }else{
-      // Plain text / code file
-      showStatus("📄 Reading file...");
-      const text=await readText(file);
-      att={name:file.name,content:`[File: ${file.name}]\n\`\`\`\n${text}\n\`\`\``,
-           isImage:false,meta:formatSize(file.size)};
-      showFP(file.name,formatSize(file.size),null);
+      const txt=await readText(file);
+      att={name:file.name,content:`[File: ${file.name}]\n\`\`\`\n${txt}\n\`\`\``,
+           isImage:false,meta:fmtSize(file.size)};
     }
 
+    fpName.textContent=att.name; fpMeta.textContent=att.meta||'';
+    fpStrip.classList.add("on");
+    setStatus("Attached: "+att.name, "#6a9955");
   }catch(err){
-    showErr("Could not read file: "+err.message);
+    setStatus("Error: "+err.message, "#f44747");
   }finally{
-    hideStatus();processing=false;updateBtn();
+    processing=false; updateBtn();
   }
 }
 
-function showFP(name,meta,dataUrl){
-  fpIcon.textContent=getIcon(name);
-  fpName.textContent=name;
-  fpMeta.textContent=meta;
-  if(dataUrl){fpThumb.src=dataUrl;fpThumb.style.display="block";}
-  else{fpThumb.style.display="none";}
-  fpBar.classList.add("on");
-}
-function removeFile(){att=null;fpBar.classList.remove("on");fpThumb.style.display="none";updateBtn();}
+function removeFile(){ att=null; fpStrip.classList.remove("on"); setStatus("Console ready."); updateBtn(); }
 
-function escH(t){return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
-
-function addMsg(role,text,fileInfo,imgDataUrl){
-  emptyEl.style.display="none";clearBtn.style.display="block";
-  const div=document.createElement("div");div.className=`msg msg--${role}`;
-  let html=`<div class="msg-label">${role==="user"?"You":"Claude"}</div>`;
-  if(fileInfo){
-    if(imgDataUrl) html+=`<img src="${imgDataUrl}" class="img-preview-msg"/>`;
-    html+=`<div class="file-badge">${getIcon(fileInfo.name)} ${escH(fileInfo.name)} ${fileInfo.meta?'· '+escH(fileInfo.meta):''}</div>`;
-  }
-  html+=`<div class="msg-bubble">${escH(text)}</div>`;
-  div.innerHTML=html;msgsEl.appendChild(div);msgsEl.scrollTop=msgsEl.scrollHeight;
-}
-
-function clearChat(){msgs=[];msgsEl.innerHTML="";msgsEl.appendChild(emptyEl);emptyEl.style.display="block";clearBtn.style.display="none";hideErr();removeFile();}
-
+// ── SEND ──────────────────────────────────────────────────────────────────────
 async function send(){
   const text=inp.value.trim();
   if((!text&&!att)||loading)return;
-  loading=true;sendBtn.disabled=true;inp.value="";inp.style.height="40px";hideErr();
+  loading=true; runBtn.disabled=true; inp.value=""; inp.style.height="20px";
 
-  const displayText=text||(att?`Please review: ${att.name}`:"");
-  const fileInfo=att?{name:att.name,meta:att.meta}:null;
-  const imgDataUrl=att?.isImage?att.dataUrl:null;
+  // Show user question as code comment
+  addBlank();
+  const commentLines = (text||(att?`Attached: ${att.name}`:'')).split('\n');
+  commentLines.forEach(l => addLines(["// " + l], "comment"));
+  if(att) addLines([`// [file: ${att.name} ${att.meta||''}]`], "file");
+  addBlank();
+
+  setStatus("Running...", "#dcdcaa");
+  statusLeft.textContent = "Processing query...";
 
   // Build API content
   let apiContent;
   if(att&&att.isImage){
     apiContent=[
       {type:"image",source:{type:"base64",media_type:att.mediaType,data:att.content}},
-      {type:"text",text:text||"Please describe and analyse this image."}
+      {type:"text",text:text||"Describe and analyse this image."}
     ];
   }else if(att){
-    const userText=text||"Please review this file and help me.";
-    apiContent=att.content+"\n\n"+userText;
+    apiContent=att.content+"\n\n"+(text||"Please review this file and help me.");
   }else{
     apiContent=text;
   }
 
   removeFile();
   msgs.push({role:"user",content:apiContent});
-  addMsg("user",displayText,fileInfo,imgDataUrl);
-
-  const t=document.createElement("div");t.className="typing";t.textContent="Claude is thinking...";
-  msgsEl.appendChild(t);msgsEl.scrollTop=msgsEl.scrollHeight;
 
   try{
     const res=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({messages:[{role:"system",content:SYSTEM},...msgs]})});
-    const data=await res.json();t.remove();
-    if(!res.ok||data.error){showErr(data.error||"Something went wrong.");msgs.pop();}
-    else{msgs.push({role:"assistant",content:data.reply});addMsg("assistant",data.reply);}
-  }catch(e){t.remove();showErr("Connection error: "+e.message);msgs.pop();}
-  finally{loading=false;updateBtn();}
+    const data=await res.json();
+
+    if(!res.ok||data.error){
+      addLines(["// ERROR: "+(data.error||"Something went wrong.")], "comment");
+      setStatus("Error.", "#f44747");
+      msgs.pop();
+    }else{
+      msgs.push({role:"assistant",content:data.reply});
+      // Show response as code
+      const respLines=data.reply.split('\n');
+      respLines.forEach(l=>addLines([l||" "],"response"));
+      addBlank();
+      setStatus("Done — "+respLines.length+" lines", "#6a9955");
+      statusLeft.textContent = "MobileServiceTest.java — Java 17 — UTF-8";
+    }
+  }catch(e){
+    addLines(["// CONNECTION ERROR: "+e.message],"comment");
+    setStatus("Connection error.", "#f44747");
+    msgs.pop();
+  }finally{
+    loading=false; updateBtn();
+  }
 }
 </script>
 </body>
