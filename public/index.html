@@ -161,9 +161,23 @@ function isTextFile(name){return TEXT_EXTS.includes(getExt(name));}
 // ── PROCESS ANY ARCHIVE (zip, rar, 7z, tar, gz etc.) ─────────────────────────
 async function processZip(file){
   showStatus("📦 Extracting "+file.name+"...");
+  console.log("[Archive] Starting extraction of:", file.name, "size:", file.size);
 
-  const archive = await Unarchiver.open(file);
-  const allEntries = archive.entries.filter(e => e.is_file && !shouldSkip(e.name));
+  let archive;
+  try {
+    archive = await Unarchiver.open(file);
+    console.log("[Archive] Opened successfully, total entries:", archive.entries.length);
+  } catch(e) {
+    console.error("[Archive] Failed to open:", e);
+    throw new Error("Could not open archive: " + e.message);
+  }
+
+  const allEntries = archive.entries.filter(e => {
+    const keep = e.is_file && !shouldSkip(e.name);
+    if(!keep) console.log("[Archive] Skipping:", e.name);
+    return keep;
+  });
+  console.log("[Archive] Files to process:", allEntries.length);
 
   // Sort — Java files first
   allEntries.sort((a,b)=>{
@@ -180,20 +194,30 @@ async function processZip(file){
 
   let processed = 0;
   for(const entry of allEntries){
+    const shortName = entry.name.split('/').pop();
+    console.log(`[Archive] Processing ${++processed}/${allEntries.length}: ${entry.name} — isText: ${isTextFile(entry.name)}`);
+    showStatus(`📦 Reading ${processed}/${allEntries.length}: ${shortName}...`);
+
     if(isTextFile(entry.name)){
-      showStatus(`📦 Reading ${++processed}/${allEntries.length}: ${entry.name.split('/').pop()}...`);
       try{
-        const entryFile = await entry.read();
-        const text = await entryFile.text();
+        // Timeout per file — 5 seconds max
+        const text = await Promise.race([
+          entry.read().then(f => f.text()),
+          new Promise((_,rej) => setTimeout(() => rej(new Error("timeout")), 5000))
+        ]);
+        console.log(`[Archive] Read OK: ${entry.name} — ${text.length} chars`);
         content += `=== ${entry.name} ===\n${text}\n\n`;
       }catch(e){
+        console.warn(`[Archive] Failed to read ${entry.name}:`, e.message);
         content += `=== ${entry.name} ===\n[Could not read: ${e.message}]\n\n`;
       }
     }else{
+      console.log(`[Archive] Binary skip: ${entry.name}`);
       content += `=== ${entry.name} ===\n[Binary file — skipped]\n\n`;
     }
   }
 
+  console.log("[Archive] Extraction complete. Content length:", content.length);
   return{content, meta:`${allEntries.length} files extracted`};
 }
 
