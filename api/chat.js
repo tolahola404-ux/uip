@@ -10,19 +10,27 @@ export default async function handler(req, res) {
   const { messages } = req.body;
 
   try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const systemMsg = messages.find(m => m.role === "system");
+    const chatMessages = messages
+      .filter(m => m.role !== "system")
+      .map(m => ({ role: m.role, content: m.content }));
+
+    const body = {
+      model: "claude-opus-4-6",
+      max_tokens: 4096,
+      messages: chatMessages,
+    };
+    if (systemMsg) body.system = systemMsg.content;
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "files-api-2025-04-14",
       },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: messages,
-        stream: false,
-        max_tokens: 2048,
-        temperature: 0.7,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -31,7 +39,7 @@ export default async function handler(req, res) {
     }
 
     const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content;
+    const reply = data.content?.[0]?.text;
     return res.status(200).json({ reply });
 
   } catch (err) {
