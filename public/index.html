@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Notes Tool</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://xenova.github.io/unarchiver.js/dist/unarchiver.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <style>
@@ -116,7 +116,7 @@ function hideStatus(){statusBar.style.display="none";}
 
 // ── FILE TYPE HELPERS ────────────────────────────────────────────────────────
 function getExt(name){return name.split('.').pop().toLowerCase();}
-function isZip(name){return['zip','rar','7z','tar','gz','bz2'].includes(getExt(name));}
+function isZip(name){return['zip','rar','7z','tar','gz','bz2','xz','cab','iso','lzma'].includes(getExt(name));}
 function isImage(name,mime){return['jpg','jpeg','png','gif','webp','bmp','svg'].includes(getExt(name))||mime.startsWith('image/');}
 function isPDF(name){return getExt(name)==='pdf';}
 function isWord(name){return['doc','docx'].includes(getExt(name));}
@@ -158,45 +158,43 @@ const TEXT_EXTS=['java','js','ts','py','c','cpp','cs','go','rb','php','swift','k
   'properties','env','toml','ini','cfg','gradle','xml','pom','log','jsp','ftl'];
 function isTextFile(name){return TEXT_EXTS.includes(getExt(name));}
 
-// ── PROCESS ZIP ───────────────────────────────────────────────────────────────
+// ── PROCESS ANY ARCHIVE (zip, rar, 7z, tar, gz etc.) ─────────────────────────
 async function processZip(file){
   showStatus("📦 Extracting "+file.name+"...");
-  const buf=await readBuf(file);
-  const zip=await JSZip.loadAsync(buf);
 
-  const allPaths=[];
-  zip.forEach((path,entry)=>{if(!entry.dir&&!shouldSkip(path)) allPaths.push({path,entry});});
+  const archive = await Unarchiver.open(file);
+  const allEntries = archive.entries.filter(e => e.is_file && !shouldSkip(e.name));
 
-  // Sort — Java files first, then others
-  allPaths.sort((a,b)=>{
-    const aJ=a.path.endsWith('.java')?0:1;
-    const bJ=b.path.endsWith('.java')?0:1;
-    return aJ-bJ||a.path.localeCompare(b.path);
+  // Sort — Java files first
+  allEntries.sort((a,b)=>{
+    const aJ=a.name.endsWith('.java')?0:1;
+    const bJ=b.name.endsWith('.java')?0:1;
+    return aJ-bJ||a.name.localeCompare(b.name);
   });
 
-  // Build tree
-  const treePaths=allPaths.map(f=>"  "+f.path);
-  let content=`[Archive: ${file.name}]\n`;
-  content+=`Total files: ${allPaths.length}\n\n`;
-  content+=`Project Structure:\n${treePaths.join('\n')}\n\n`;
-  content+="=".repeat(60)+"\n\n";
+  const treePaths = allEntries.map(e => "  "+e.name);
+  let content = `[Archive: ${file.name}]\n`;
+  content += `Total files: ${allEntries.length}\n\n`;
+  content += `Project Structure:\n${treePaths.join('\n')}\n\n`;
+  content += "=".repeat(60)+"\n\n";
 
-  let processed=0;
-  for(const {path,entry} of allPaths){
-    if(isTextFile(path)){
-      showStatus(`📦 Reading ${++processed}/${allPaths.length}: ${path.split('/').pop()}...`);
+  let processed = 0;
+  for(const entry of allEntries){
+    if(isTextFile(entry.name)){
+      showStatus(`📦 Reading ${++processed}/${allEntries.length}: ${entry.name.split('/').pop()}...`);
       try{
-        const text=await entry.async("string");
-        content+=`=== ${path} ===\n${text}\n\n`;
+        const entryFile = await entry.read();
+        const text = await entryFile.text();
+        content += `=== ${entry.name} ===\n${text}\n\n`;
       }catch(e){
-        content+=`=== ${path} ===\n[Could not read: ${e.message}]\n\n`;
+        content += `=== ${entry.name} ===\n[Could not read: ${e.message}]\n\n`;
       }
     }else{
-      content+=`=== ${path} ===\n[Binary file — skipped]\n\n`;
+      content += `=== ${entry.name} ===\n[Binary file — skipped]\n\n`;
     }
   }
 
-  return{content,meta:`${allPaths.length} files extracted`};
+  return{content, meta:`${allEntries.length} files extracted`};
 }
 
 // ── PROCESS PDF ───────────────────────────────────────────────────────────────
